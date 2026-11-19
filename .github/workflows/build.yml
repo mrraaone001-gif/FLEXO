@@ -18,17 +18,41 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract and build
+      - name: Find and extract project ZIP
+        shell: bash
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -iname '*.zip' | head -n 1)
-          mkdir project
+          set -e
+          ZIP_FILE=$(find . -type f -iname '*.zip' \
+            -not -path './.git/*' \
+            -print -quit)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No ZIP file found in repository."
+            find . -maxdepth 4 -type f
+            exit 1
+          fi
+
+          echo "Found: $ZIP_FILE"
+          mkdir -p project
           unzip -q "$ZIP_FILE" -d project
-          GRADLEW=$(find project -name gradlew -type f | head -n 1)
+
+      - name: Build Android APK
+        shell: bash
+        run: |
+          set -e
+          GRADLEW=$(find project -type f -name gradlew -print -quit)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: Gradle wrapper not found."
+            find project -maxdepth 5 -type f
+            exit 1
+          fi
+
           chmod +x "$GRADLEW"
           cd "$(dirname "$GRADLEW")"
           ./gradlew assembleDebug
 
-      - name: Save APK
+      - name: Upload FLEXO APK
         uses: actions/upload-artifact@v4
         with:
           name: FLEXO-Android-APK
