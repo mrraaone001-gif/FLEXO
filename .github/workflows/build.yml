@@ -18,41 +18,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Find and extract project ZIP
-        shell: bash
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Extract project
         run: |
           set -e
-          ZIP_FILE=$(find . -type f -iname '*.zip' \
-            -not -path './.git/*' \
-            -print -quit)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found in repository."
-            find . -maxdepth 4 -type f
-            exit 1
-          fi
-
-          echo "Found: $ZIP_FILE"
+          ZIP_FILE=$(find . -type f -iname '*.zip' -not -path './.git/*' -print -quit)
+          test -n "$ZIP_FILE"
           mkdir -p project
           unzip -q "$ZIP_FILE" -d project
 
       - name: Build Android APK
-        shell: bash
         run: |
           set -e
-          GRADLEW=$(find project -type f -name gradlew -print -quit)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: Gradle wrapper not found."
-            find project -maxdepth 5 -type f
+          BUILD_FILE=$(find project -name settings.gradle -o -name settings.gradle.kts | head -n 1)
+          if [ -z "$BUILD_FILE" ]; then
+            echo "Android Gradle settings file not found"
             exit 1
           fi
+          cd "$(dirname "$BUILD_FILE")"
+          gradle assembleDebug
 
-          chmod +x "$GRADLEW"
-          cd "$(dirname "$GRADLEW")"
-          ./gradlew assembleDebug
-
-      - name: Upload FLEXO APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: FLEXO-Android-APK
